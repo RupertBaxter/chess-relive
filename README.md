@@ -10,8 +10,10 @@ Rewatch finished Lichess broadcast games in real time, with clocks reconstructed
 
 ## Run
 
+Open `index.html` in a browser (double-click it). No server or build step is needed. Requires internet access (Lichess API, chess.js and piece images from jsDelivr).
+
+Optionally, serve it locally instead:
+
 ```bash
 python3 -m http.server 8765
 ```
-
-Then open http://localhost:8765. A local server is needed (opening the file directly can block the Lichess API requests). Requires internet access (Lichess API, chess.js and piece images from jsDelivr).
