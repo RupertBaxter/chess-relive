@@ -10,12 +10,3 @@ Rewatch finished Lichess broadcast games in real time, with clocks reconstructed
 - Guess-the-move mode with score and instant feedback
 - Auto / light / dark theme
 
-## Run
-
-Open `index.html` in a browser (double-click it). No server or build step is needed. Requires internet access (Lichess API, chess.js and piece images from jsDelivr).
-
-Optionally, serve it locally instead:
-
-```bash
-python3 -m http.server 8765
-```
