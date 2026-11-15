@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chess Relive</title>
+<style>
+:root{
+  --bg:#f4f2ee; --panel:#ffffff; --text:#1d1d1f; --muted:#6b6b70; --line:#e2dfd8;
+  --accent:#2f6f4f; --accent-ink:#fff; --hover:#efece5;
+  --light-sq:#ebd8b7; --dark-sq:#a97a55; --hl:rgba(155,199,0,.45); --check:rgba(220,40,40,.65);
+  --clock-bg:#e9e6df; --clock-run:#2f6f4f; --clock-low:#b3261e;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#161512; --panel:#22201c; --text:#e8e6e1; --muted:#9a968d; --line:#35322c;
+    --accent:#5aa77c; --accent-ink:#0f1a13; --hover:#2c2924;
+    --light-sq:#c9b28e; --dark-sq:#8a6243;
+    --clock-bg:#2c2924; --clock-run:#5aa77c; --clock-low:#e5534b;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#161512; --panel:#22201c; --text:#e8e6e1; --muted:#9a968d; --line:#35322c;
+  --accent:#5aa77c; --accent-ink:#0f1a13; --hover:#2c2924;
+  --light-sq:#c9b28e; --dark-sq:#8a6243;
+  --clock-bg:#2c2924; --clock-run:#5aa77c; --clock-low:#e5534b;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{color-scheme:light}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:4px 10px;font-size:13px;background:var(--panel)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.active{background:var(--accent);color:var(--accent-ink)}
+/* guess the move */
+:root{--guess:rgba(40,120,230,.55);--ok:#2e9d5b;--bad:#d64541}
+.board.guessable .sq{cursor:pointer}
+.sq.sel::after{content:"";position:absolute;inset:0;background:rgba(40,120,230,.35)}
+.sq.dot::before{content:"";position:absolute;left:36%;top:36%;width:28%;height:28%;border-radius:50%;background:rgba(0,0,0,.22);z-index:2}
+.sq.dot.cap::before{left:4%;top:4%;width:92%;height:92%;background:transparent;border:4px solid rgba(0,0,0,.22);box-sizing:border-box}
+.sq.gfrom,.sq.gto{box-shadow:inset 0 0 0 4px var(--guess)}
+.bwrap{position:relative;transition:box-shadow .2s, border-color .2s}
+.bwrap.fb-ok{border-color:var(--ok);box-shadow:0 0 0 3px var(--ok)}
+.bwrap.fb-bad{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad)}
+.toast{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:3;padding:8px 14px;border-radius:10px;font-weight:700;font-size:15px;color:#fff;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.3);animation:pop .25s ease-out;white-space:nowrap}
+.toast.ok{background:var(--ok)} .toast.bad{background:var(--bad)}
+@keyframes pop{from{transform:translate(-50%,-50%) scale(.7)}to{transform:translate(-50%,-50%) scale(1)}}
+.gstate{font-size:12px;color:var(--muted)}
+.gstate b{color:var(--text)}
+.score{font-weight:600;font-variant-numeric:tabular-nums}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;letter-spacing:.2px}
+header h1 span{color:var(--accent)}
+.crumbs{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:14px;flex-wrap:wrap}
+.crumbs a{color:var(--text);cursor:pointer;text-decoration:none}
+.crumbs a:hover{text-decoration:underline}
+.spacer{flex:1}
+label.toggle{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--muted);cursor:pointer;user-select:none}
+main{padding:20px;max-width:1500px;margin:0 auto}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{background:var(--hover)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+input[type=text]{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 0 10px}
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;gap:12px;align-items:center}
+.card:hover{border-color:var(--accent)}
+.card img{width:72px;height:36px;object-fit:cover;border-radius:4px;flex:none;background:var(--hover)}
+.card .t{font-weight:600}
+.card .s{font-size:13px;color:var(--muted)}
+.card.disabled{opacity:.45;cursor:default}
+.badge{font-size:11px;padding:1px 6px;border-radius:99px;background:var(--hover);color:var(--muted);margin-left:6px;vertical-align:middle}
+.badge.live{background:#c0392b;color:#fff}
+.msg{color:var(--muted);padding:20px 0}
+.err{color:var(--clock-low)}
+table.games{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+table.games td,table.games th{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+table.games th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+table.games tr:hover td{background:var(--hover)}
+table.games td.num{color:var(--muted);width:40px}
+.elo{color:var(--muted);font-size:12px}
+.title{color:#c48a1c;font-weight:600;margin-right:3px}
+
+/* replay */
+.controls{position:sticky;top:57px;z-index:4;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:18px}
+.controls .group{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.controls .glabel{font-size:12px;color:var(--muted);margin-right:4px;text-transform:uppercase;letter-spacing:.06em}
+.controls button{padding:5px 9px;font-size:14px}
+#playBtn{min-width:92px}
+.elapsed{font-variant-numeric:tabular-nums;font-size:22px;font-weight:600}
+.elapsed small{font-size:12px;color:var(--muted);font-weight:400;display:block;margin-top:-2px}
+.boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--bsize,300px),1fr));gap:18px}
+.bwrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+.pl{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 2px}
+.pl .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.clock{font-variant-numeric:tabular-nums;font-weight:600;font-size:17px;padding:2px 9px;border-radius:6px;background:var(--clock-bg);min-width:78px;text-align:right}
+.clock.run{background:var(--clock-run);color:var(--accent-ink)}
+.clock.low{color:var(--clock-low)}
+.clock.run.low{background:var(--clock-low);color:#fff}
+.board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:4px;overflow:hidden;user-select:none}
+.sq{position:relative;background:var(--light-sq)}
+.sq.d{background:var(--dark-sq)}
+.sq.hl::after{content:"";position:absolute;inset:0;background:var(--hl)}
+.sq.chk{background:radial-gradient(circle,var(--check) 0%,rgba(220,40,40,.25) 55%,transparent 75%),var(--light-sq)}
+.sq.d.chk{background:radial-gradient(circle,var(--check) 0%,rgba(220,40,40,.25) 55%,transparent 75%),var(--dark-sq)}
+.sq img{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.sq .co{position:absolute;font-size:9px;font-weight:600;z-index:2;opacity:.75}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:6px 2px 0;min-height:28px}
+.moves{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left;padding:2px}
+.moves span{direction:ltr;unicode-bidi:isolate}
+.foot button{font-size:12px;padding:2px 8px}
+.over{color:var(--text);font-weight:600}
+.warn{font-size:12px;color:#c48a1c}
+kbd{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--hover)}
+.help{font-size:12px;color:var(--muted);margin-top:14px}
+input[type=range]{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>♞ Chess <span>Relive</span></h1>
+  <nav class="crumbs" id="crumbs"></nav>
+  <div class="spacer"></div>
+  <label class="toggle"><input type="checkbox" id="showResults"> Show results</label>
+  <div class="seg" id="themeSeg" title="Theme">
+    <button data-theme="auto">Auto</button><button data-theme="light">☀ Light</button><button data-theme="dark">☾ Dark</button>
+  </div>
+</header>
+<script>
+  // Theme: "auto" follows the device setting; choice is remembered per browser.
+  (function(){
+    let t = 'auto'; try { t = localStorage.getItem('cr-theme') || 'auto'; } catch {}
+    const apply = v => {
+      if (v === 'auto') document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', v);
+      document.querySelectorAll('#themeSeg button').forEach(b => b.classList.toggle('active', b.dataset.theme === v));
+    };
+    apply(t);
+    document.querySelectorAll('#themeSeg button').forEach(b => b.onclick = () => {
+      apply(b.dataset.theme); try { localStorage.setItem('cr-theme', b.dataset.theme); } catch {}
+    });
+  })();
+</script>
+<main id="app"></main>
+
+<script type="module">
+import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
+
+const API = 'https://lichess.org/api';
+const PIECE_URL = p => `https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/cburnett/${p}.svg`;
+const app = document.getElementById('app');
+const crumbsEl = document.getElementById('crumbs');
+const showResultsEl = document.getElementById('showResults');
+
+const state = { tour: null, round: null, games: [], replay: null, pastPage: 1 };
+
+/* ---------- helpers ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function getJSON(url){ const r = await fetch(url); if(!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json(); }
+function fmtDate(ms){ return ms ? new Date(ms).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}) : ''; }
+function fmtClock(sec){
+  if (sec == null) return '–';
+  sec = Math.max(0, sec);
+  if (sec < 10) return `0:0${sec.toFixed(1)}`;
+  const s = Math.floor(sec), h = Math.floor(s/3600), m = Math.floor(s%3600/60), ss = s%60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}` : `${m}:${String(ss).padStart(2,'0')}`;
+}
+function fmtElapsed(sec){ const s=Math.floor(sec),h=Math.floor(s/3600),m=Math.floor(s%3600/60); return `${h}:${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function parseTimeInput(str){
+  const p = str.trim().split(':').map(Number); if (p.some(isNaN) || !p.length) return null;
+  return p.reduce((a,v)=>a*60+v,0) * (p.length===1 ? 60 : 1); // single number = minutes
+}
+function setCrumbs(items){
+  crumbsEl.innerHTML = '';
+  items.forEach((it,i)=>{
+    if (i) crumbsEl.append('›');
+    const a = document.createElement(it.go ? 'a' : 'span');
+    a.textContent = it.label; if (it.go) a.onclick = it.go;
+    crumbsEl.append(a);
+  });
+}
+const spoilersOn = () => showResultsEl.checked;
+showResultsEl.addEventListener('change', () => {
+  if (state.replay) state.replay.forceRender();
+  else if (state.games.length && document.getElementById('gamesTable')) renderGameRows();
+});
+
+/* ---------- PGN parsing ---------- */
+function splitPgn(text){
+  const games = []; let cur = null, inMoves = false;
+  for (const line of text.split(/\r?\n/)){
+    if (line.startsWith('[')){
+      if (!cur || inMoves){ cur = { headers:{}, movetext:'' }; games.push(cur); inMoves = false; }
+      const m = line.match(/^\[(\w+)\s+"(.*)"\]\s*$/); if (m) cur.headers[m[1]] = m[2].replace(/\\"/g,'"');
+    } else if (cur && line.trim()){ inMoves = true; cur.movetext += line + '\n'; }
+  }
+  return games;
+}
+function parseMovetext(mt){
+  const plies = []; let i = 0, depth = 0;
+  while (i < mt.length){
+    const c = mt[i];
+    if (c === '{'){
+      const j = mt.indexOf('}', i); const body = mt.slice(i+1, j < 0 ? mt.length : j);
+      if (depth === 0 && plies.length){
+        const m = body.match(/\[%clk\s+(\d+):(\d+):(\d+(?:\.\d+)?)\]/);
+        if (m) plies[plies.length-1].clk = (+m[1])*3600 + (+m[2])*60 + (+m[3]);
+      }
+      i = j < 0 ? mt.length : j+1; continue;
+    }
+    if (c === ';'){ const j = mt.indexOf('\n', i); i = j < 0 ? mt.length : j+1; continue; }
+    if (c === '('){ depth++; i++; continue; }
+    if (c === ')'){ depth--; i++; continue; }
+    if (/\s/.test(c)){ i++; continue; }
+    let j = i; while (j < mt.length && !/[\s{}();]/.test(mt[j])) j++;
+    const tok = mt.slice(i, j); i = j;
+    if (depth > 0) continue;
+    if (/^\d+\.+$/.test(tok) || /^\$\d+$/.test(tok) || /^(1-0|0-1|1\/2-1\/2|\*|½-½)$/.test(tok)) continue;
+    const san = tok.replace(/^\d+\.+/, '').replace(/[!?]+$/, '');
+    if (san) plies.push({ san, clk: null });
+  }
+  return plies;
+}
+const COMMON_INC = [0,1,2,3,5,10,15,20,30,60];
+const COMMON_BONUS = [5,10,15,20,30,40,45,50,60,75,90].map(m=>m*60);
+
+function parseIncFromText(t){
+  if (!t) return null;
+  let m = t.match(/^(?:\d+\/)?\d+\+(\d+)/); if (m) return +m[1];
+  m = t.match(/(\d+)\s*(?:s\b|sec|second|″|")/i); if (m) return +m[1];
+  return null;
+}
+
+function buildGame(raw, idx, tourTc){
+  const h = raw.headers;
+  const plies = parseMovetext(raw.movetext);
+  // replay through chess.js
+  const chess = new Chess(h.FEN || undefined);
+  const positions = [{ fen: chess.fen(), from:null, to:null, check:false }];
+  const valid = [];
+  for (const p of plies){
+    let mv; try { mv = chess.move(p.san); } catch { break; }
+    if (!mv) break;
+    valid.push(p);
+    positions.push({ fen: chess.fen(), from: mv.from, to: mv.to, check: chess.inCheck(), promotion: mv.promotion || null, san: mv.san });
+  }
+  const startWhite = positions[0].fen.split(' ')[1] === 'w';
+  const sideOf = i => ((i % 2 === 0) === startWhite) ? 'w' : 'b';
+
+  // --- infer increment ---
+  const last = { w:null, b:null }; let maxGain = 0;
+  valid.forEach((p,i)=>{ const s = sideOf(i); if (p.clk!=null){ if (last[s]!=null){ const g = p.clk - last[s]; if (g < 120) maxGain = Math.max(maxGain, g); } last[s] = p.clk; } });
+  let inc = parseIncFromText(h.TimeControl) ?? parseIncFromText(tourTc);
+  if (inc == null || inc < maxGain - 2) inc = COMMON_INC.find(v => v >= maxGain - 0.5) ?? Math.ceil(maxGain);
+
+  // --- initial time ---
+  const firstClk = { w: valid.find((p,i)=>sideOf(i)==='w' && p.clk!=null)?.clk, b: valid.find((p,i)=>sideOf(i)==='b' && p.clk!=null)?.clk };
+  const hasClocks = firstClk.w != null || firstClk.b != null;
+  let initial = hasClocks ? Math.round((Math.max(firstClk.w ?? 0, firstClk.b ?? 0) - inc) / 60) * 60 : null;
+  if (initial != null && initial <= 0) initial = Math.max(firstClk.w ?? 0, firstClk.b ?? 0);
+
+  // --- think times ---
+  const known = [];
+  const thinks = valid.map(()=>null);
+  const prev = { w: initial, b: initial };
+  valid.forEach((p,i)=>{
+    const s = sideOf(i);
+    if (p.clk != null && prev[s] != null){
+      let raw = prev[s] + inc - p.clk;
+      if (raw < -60){ const extra = -raw; const bonus = COMMON_BONUS.find(b => b >= extra) ?? Math.ceil(extra/300)*300; raw += bonus; }
+      thinks[i] = Math.max(raw, 0.5); known.push(thinks[i]);
+    }
+    if (p.clk != null) prev[s] = p.clk;
+  });
+  const sorted = [...known].sort((a,b)=>a-b);
+  const fallback = sorted.length ? sorted[Math.floor(sorted.length/2)] : 30;
+  const moveTimes = []; const clkAfter = []; let t = 0;
+  const disp = { w: initial, b: initial };
+  valid.forEach((p,i)=>{
+    const s = sideOf(i); const th = thinks[i] ?? fallback; t += th; moveTimes.push(t);
+    if (p.clk != null) disp[s] = p.clk; else if (disp[s] != null) disp[s] = Math.max(0, disp[s] + inc - th);
+    clkAfter.push(disp[s]);
+  });
+
+  const missing = valid.filter(p=>p.clk==null).length;
+  return {
+    idx, headers: h, white: h.White || '?', black: h.Black || '?',
+    whiteElo: h.WhiteElo, blackElo: h.BlackElo, whiteTitle: h.WhiteTitle, blackTitle: h.BlackTitle,
+    board: h.Board || (h.Round?.includes('.') ? h.Round.split('.').pop() : String(idx+1)),
+    result: h.Result || '*', plies: valid, positions, moveTimes, clkAfter, initial, inc,
+    startWhite, sideOf, hasClocks, clockGaps: missing, end: t,
+  };
+}
+
+/* ---------- Screen 1: events ---------- */
+function tourCard(tour, extra){
+  const el = document.createElement('div'); el.className = 'card';
+  const dates = tour.dates ? fmtDate(tour.dates[0]) + (tour.dates[1] ? ' – ' + fmtDate(tour.dates[1]) : '') : fmtDate(tour.createdAt);
+  el.innerHTML = `${tour.image ? `<img src="${esc(tour.image)}" alt="">` : ''}
+    <div><div class="t">${esc(tour.name)}${extra||''}</div>
+    <div class="s">${esc([dates, tour.info?.tc || tour.info?.fideTC, tour.info?.location].filter(Boolean).join(' · '))}</div></div>`;
+  el.onclick = () => openTour(tour.id);
+  return el;
+}
+async function showEvents(){
+  stopReplay(); state.tour = null; state.round = null;
+  setCrumbs([{label:'Events'}]);
+  app.innerHTML = `
+    <div class="row"><input type="text" id="q" placeholder="Search broadcasts (e.g. Norway Chess, Olympiad)…" style="flex:1;min-width:240px"><button id="qb" class="primary">Search</button></div>
+    <div id="results"></div>`;
+  const results = document.getElementById('results');
+  const doSearch = async () => {
+    const q = document.getElementById('q').value.trim(); if (!q) return loadTop(results);
+    results.innerHTML = '<div class="msg">Searching…</div>';
+    try {
+      const d = await getJSON(`${API}/broadcast/search?q=${encodeURIComponent(q)}&page=1`);
+      results.innerHTML = '<div class="section-title">Search results</div>';
+      const list = document.createElement('div'); list.className = 'list';
+      d.currentPageResults.forEach(r => list.append(tourCard(r.tour)));
+      if (!d.currentPageResults.length) results.innerHTML += '<div class="msg">No broadcasts found.</div>';
+      results.append(list);
+    } catch(e){ results.innerHTML = `<div class="msg err">Search failed: ${esc(e.message)}</div>`; }
+  };
+  document.getElementById('qb').onclick = doSearch;
+  document.getElementById('q').onkeydown = e => { if (e.key === 'Enter') doSearch(); };
+  loadTop(results);
+}
+async function loadTop(results){
+  results.innerHTML = '<div class="msg">Loading broadcasts…</div>';
+  try {
+    const d = await getJSON(`${API}/broadcast/top?page=1`);
+    results.innerHTML = '';
+    if (d.active?.length){
+      results.insertAdjacentHTML('beforeend','<div class="section-title">Ongoing events <span class="s">(finished rounds can be replayed)</span></div>');
+      const l = document.createElement('div'); l.className='list';
+      d.active.forEach(r => l.append(tourCard(r.tour, r.round && !r.round.finished && r.round.ongoing ? '<span class="badge live">LIVE</span>' : '')));
+      results.append(l);
+    }
+    results.insertAdjacentHTML('beforeend','<div class="section-title">Recently finished</div>');
+    const past = document.createElement('div'); past.className = 'list'; results.append(past);
+    const seen = new Set();
+    const addPast = page => page.currentPageResults.forEach(r => { if (!seen.has(r.tour.id)){ seen.add(r.tour.id); past.append(tourCard(r.tour)); }});
+    addPast(d.past);
+    let next = d.past.nextPage;
+    const more = document.createElement('button'); more.textContent = 'Load more'; more.style.marginTop = '14px';
+    more.onclick = async () => {
+      more.disabled = true; more.textContent = 'Loading…';
+      try { const p = await getJSON(`${API}/broadcast/top?page=${next}`); addPast(p.past); next = p.past.nextPage; }
+      catch(e){ alert('Failed: ' + e.message); }
+      more.disabled = !next; more.textContent = next ? 'Load more' : 'No more';
+    };
+    if (next) results.append(more);
+  } catch(e){ results.innerHTML = `<div class="msg err">Could not reach Lichess: ${esc(e.message)}</div>`; }
+}
+
+/* ---------- Screen 2: rounds ---------- */
+async function openTour(id){
+  stopReplay();
+  app.innerHTML = '<div class="msg">Loading event…</div>';
+  try {
+    const d = await getJSON(`${API}/broadcast/${id}`);
+    state.tour = d.tour; state.tourGroup = d.group;
+    setCrumbs([{label:'Events', go: showEvents}, {label: d.tour.name}]);
+    app.innerHTML = `<h2 style="margin:4px 0 2px">${esc(d.tour.name)}</h2>
+      <div class="s" style="color:var(--muted)">${esc([d.tour.info?.format, d.tour.info?.tc, d.tour.info?.location].filter(Boolean).join(' · '))}</div>`;
+    if (d.group?.tours?.length > 1){
+      const g = document.createElement('div'); g.className = 'row'; g.style.marginTop = '12px';
+      d.group.tours.forEach(t => { const b = document.createElement('button'); b.textContent = t.name; if (t.id === id) b.className = 'active'; b.onclick = () => openTour(t.id); g.append(b); });
+      app.append(g);
+    }
+    app.insertAdjacentHTML('beforeend','<div class="section-title">Rounds</div>');
+    const list = document.createElement('div'); list.className = 'list'; app.append(list);
+    d.rounds.forEach(r => {
+      const el = document.createElement('div'); el.className = 'card' + (r.finished ? '' : ' disabled');
+      el.innerHTML = `<div><div class="t">${esc(r.name)}${r.finished ? '' : `<span class="badge${r.ongoing ? ' live' : ''}">${r.ongoing ? 'LIVE' : 'not finished'}</span>`}</div>
+        <div class="s">${esc(r.startsAt ? new Date(r.startsAt).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}) : '')}</div></div>`;
+      if (r.finished) el.onclick = () => openRound(r);
+      list.append(el);
+    });
+    if (!d.rounds.length) app.insertAdjacentHTML('beforeend','<div class="msg">No rounds.</div>');
+  } catch(e){ app.innerHTML = `<div class="msg err">Failed to load event: ${esc(e.message)}</div>`; }
+}
+
+/* ---------- Screen 3: games ---------- */
+async function openRound(round){
+  stopReplay();
+  state.round = round;
+  const tour = state.tour;
+  setCrumbs([{label:'Events', go: showEvents}, {label: tour.name, go: () => openTour(tour.id)}, {label: round.name}]);
+  app.innerHTML = '<div class="msg">Loading games…</div>';
+  try {
+    const r = await fetch(`${API}/broadcast/round/${round.id}.pgn`);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const text = await r.text();
+    state.games = splitPgn(text).map((g,i) => buildGame(g, i, tour.info?.tc)).filter(g => g.plies.length);
+    state.selected = new Set(state.games.map(g => g.idx));
+    app.innerHTML = `
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:4px 0">${esc(round.name)} <span class="badge">${state.games.length} games</span></h2>
+        <div class="row">
+          <input type="text" id="filter" placeholder="Filter players…">
+          <button id="all">All</button><button id="none">None</button>
+          <button id="start" class="primary">▶ Start replay</button>
+        </div>
+      </div>
+      <p class="s" style="color:var(--muted);margin:4px 0 14px">Pick the games to rewatch. Results, move counts and evaluations stay hidden unless “Show results” is on.</p>
+      <table class="games" id="gamesTable"><thead><tr><th></th><th>Board</th><th>White</th><th>Black</th><th id="resHead">Result</th><th></th></tr></thead><tbody></tbody></table>`;
+    renderGameRows();
+    document.getElementById('filter').oninput = renderGameRows;
+    document.getElementById('all').onclick = () => { visibleGames().forEach(g=>state.selected.add(g.idx)); renderGameRows(); };
+    document.getElementById('none').onclick = () => { visibleGames().forEach(g=>state.selected.delete(g.idx)); renderGameRows(); };
+    document.getElementById('start').onclick = () => {
+      const chosen = state.games.filter(g => state.selected.has(g.idx));
+      if (!chosen.length) return alert('Select at least one game.');
+      startReplay(chosen);
+    };
+  } catch(e){ app.innerHTML = `<div class="msg err">Failed to load games: ${esc(e.message)}</div>`; }
+}
+function visibleGames(){
+  const f = (document.getElementById('filter')?.value || '').toLowerCase();
+  return state.games.filter(g => !f || (g.white + ' ' + g.black).toLowerCase().includes(f));
+}
+const pname = (name, title, elo) => `${title ? `<span class="title">${esc(title)}</span>` : ''}${esc(name)}${elo ? ` <span class="elo">${esc(elo)}</span>` : ''}`;
+function renderGameRows(){
+  const tb = document.querySelector('#gamesTable tbody'); if (!tb) return;
+  document.getElementById('resHead').style.display = spoilersOn() ? '' : 'none';
+  tb.innerHTML = '';
+  for (const g of visibleGames()){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="num"><input type="checkbox" ${state.selected.has(g.idx) ? 'checked' : ''}></td>
+      <td class="num">${esc(g.board)}</td>
+      <td>${pname(g.white, g.whiteTitle, g.whiteElo)}</td><td>${pname(g.black, g.blackTitle, g.blackElo)}</td>
+      ${spoilersOn() ? `<td>${esc(g.result)}</td>` : ''}
+      <td class="warn">${g.hasClocks ? (g.clockGaps > 3 ? 'partial clock data' : '') : 'no clock data'}</td>`;
+    const cb = tr.querySelector('input');
+    cb.onchange = () => cb.checked ? state.selected.add(g.idx) : state.selected.delete(g.idx);
+    tr.onclick = e => { if (e.target !== cb){ cb.checked = !cb.checked; cb.onchange(); } };
+    tb.append(tr);
+  }
+}
+
+/* ---------- Screen 4: replay ---------- */
+const SPEEDS = [0.25, 0.5, 1, 2, 3, 5, 10];
+function stopReplay(){ if (state.replay){ state.replay.destroy(); state.replay = null; } }
+
+function startReplay(games){
+  stopReplay();
+  const tour = state.tour, round = state.round;
+  setCrumbs([{label:'Events', go: showEvents}, {label: tour.name, go: () => openTour(tour.id)}, {label: round.name, go: () => openRound(round)}, {label:'Replay'}]);
+  app.innerHTML = `
+    <div class="controls">
+      <div class="elapsed" id="elapsed">0:00:00<small id="status"></small></div>
+      <div class="group"><button id="playBtn" class="primary">▶ Play</button></div>
+      <div class="group"><span class="glabel">Skip</span>
+        <button data-skip="-600">−10m</button><button data-skip="-60">−1m</button><button data-skip="-10">−10s</button>
+        <button data-skip="10">+10s</button><button data-skip="60">+1m</button><button data-skip="600">+10m</button>
+        <button id="nextMove" title="Jump to the next move on any board (N)">Next move ⏭</button>
+      </div>
+      <div class="group"><span class="glabel">Speed</span>
+        <button id="slower">−</button><span id="speedChips" class="group"></span><button id="faster">+</button>
+      </div>
+      <div class="group"><span class="glabel">Go to</span><input type="text" id="goto" placeholder="h:mm:ss" style="width:90px"><button id="gotoBtn">Go</button></div>
+      <div class="group"><span class="glabel">Guess</span>
+        <label class="toggle"><input type="checkbox" id="guessOn" checked> on</label>
+        <span class="score" id="score" title="Correct guesses / guesses made">0 / 0</span>
+        <button id="resetScore" title="Reset score">↺</button>
+      </div>
+      <div class="group"><span class="glabel">Size</span><input type="range" id="size" min="200" max="640" step="20" value="320"></div>
+    </div>
+    <div class="boards" id="boards"></div>
+    <div class="help"><kbd>Space</kbd> play/pause · <kbd>←</kbd>/<kbd>→</kbd> ±10s · <kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd> ±1m · <kbd>↑</kbd>/<kbd>↓</kbd> speed · <kbd>N</kbd> next move.
+    <b>Guess the move:</b> click a piece of the side to move, then its target square — your guess is checked when the real move is played (you can change it until then; guesses after rewinding don’t count).
+    Think times are reconstructed from the <code>[%clk]</code> values in the PGN (increment and time-control bonuses are inferred). All games start together at 0:00:00.</div>`;
+
+  const boardsEl = document.getElementById('boards');
+  const score = { correct: 0, total: 0 };
+  const scoreEl = document.getElementById('score'), guessOnEl = document.getElementById('guessOn');
+  const updateScore = () => {
+    scoreEl.textContent = `${score.correct} / ${score.total}` + (score.total ? ` (${Math.round(100 * score.correct / score.total)}%)` : '');
+  };
+  const ctx = {
+    guessOn: () => guessOnEl.checked,
+    onScore: correct => { score.total++; if (correct) score.correct++; updateScore(); },
+  };
+  guessOnEl.onchange = () => render(true);
+  document.getElementById('resetScore').onclick = () => { score.correct = score.total = 0; views.forEach(v => v.resetScore()); updateScore(); };
+  const views = games.map(g => makeBoardView(g, boardsEl, ctx));
+  const endTime = Math.max(...games.map(g => g.end));
+  let t = 0, playing = false, speed = 1, lastTs = null, raf = null;
+
+  const elapsedEl = document.getElementById('elapsed'), statusEl = document.getElementById('status');
+  const playBtn = document.getElementById('playBtn');
+  const chips = document.getElementById('speedChips');
+  SPEEDS.forEach(s => { const b = document.createElement('button'); b.textContent = s + '×'; b.dataset.speed = s; b.onclick = () => setSpeed(s); chips.append(b); });
+
+  function setSpeed(s){ speed = s; chips.querySelectorAll('button').forEach(b => b.classList.toggle('active', +b.dataset.speed === s)); }
+  function setPlaying(p){
+    if (p && t >= endTime) t = endTime; // stay at end
+    playing = p && t < endTime; lastTs = null;
+    playBtn.textContent = playing ? '❚❚ Pause' : '▶ Play';
+  }
+  function seek(nt){ t = Math.min(Math.max(0, nt), endTime); render(); }
+  function render(force){
+    elapsedEl.firstChild.textContent = fmtElapsed(t);
+    const running = views.filter(v => v.update(t, force)).length;
+    statusEl.textContent = running ? `${running} of ${views.length} game${views.length>1?'s':''} in progress` : 'all games finished';
+    if (t >= endTime && playing) setPlaying(false);
+  }
+  function loop(ts){
+    if (playing){ if (lastTs != null) t = Math.min(endTime, t + (ts - lastTs) / 1000 * speed); lastTs = ts; render(); }
+    raf = requestAnimationFrame(loop);
+  }
+  playBtn.onclick = () => setPlaying(!playing);
+  app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => seek(t + +b.dataset.skip));
+  const nextMove = () => {
+    const nexts = games.map(g => g.moveTimes.find(mt => mt > t + 1e-6)).filter(x => x != null);
+    if (nexts.length) seek(Math.min(...nexts) + 1e-3);
+  };
+  document.getElementById('nextMove').onclick = nextMove;
+  const step = d => { const i = SPEEDS.indexOf(speed); setSpeed(SPEEDS[Math.min(SPEEDS.length-1, Math.max(0, i + d))]); };
+  document.getElementById('slower').onclick = () => step(-1);
+  document.getElementById('faster').onclick = () => step(1);
+  const gotoEl = document.getElementById('goto');
+  const doGoto = () => { const v = parseTimeInput(gotoEl.value); if (v != null) seek(v); gotoEl.blur(); };
+  document.getElementById('gotoBtn').onclick = doGoto;
+  gotoEl.onkeydown = e => { if (e.key === 'Enter') doGoto(); e.stopPropagation(); };
+  const sizeEl = document.getElementById('size');
+  sizeEl.oninput = () => boardsEl.style.setProperty('--bsize', sizeEl.value + 'px');
+  boardsEl.style.setProperty('--bsize', sizeEl.value + 'px');
+
+  const onKey = e => {
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+    if (e.code === 'Space'){ e.preventDefault(); setPlaying(!playing); }
+    else if (e.key === 'ArrowRight'){ e.preventDefault(); seek(t + (e.shiftKey ? 60 : 10)); }
+    else if (e.key === 'ArrowLeft'){ e.preventDefault(); seek(t - (e.shiftKey ? 60 : 10)); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); step(1); }
+    else if (e.key === 'ArrowDown'){ e.preventDefault(); step(-1); }
+    else if (e.key === 'n' || e.key === 'N') nextMove();
+  };
+  document.addEventListener('keydown', onKey);
+
+  setSpeed(1); render(true); raf = requestAnimationFrame(loop);
+  state.replay = {
+    destroy(){ cancelAnimationFrame(raf); document.removeEventListener('keydown', onKey); },
+    forceRender(){ render(true); },
+  };
+}
+
+function makeBoardView(g, parent, ctx){
+  const wrap = document.createElement('div'); wrap.className = 'bwrap';
+  wrap.innerHTML = `
+    <div class="pl top"><span class="name"></span><span class="clock"></span></div>
+    <div class="board"></div>
+    <div class="pl bot"><span class="name"></span><span class="clock"></span></div>
+    <div class="moves"><span></span></div>
+    <div class="gstate"></div>
+    <div class="foot"><span class="info"></span><span class="row"><button class="reveal" style="display:none">Reveal result</button><button class="flip" title="Flip board">⇅</button></span></div>`;
+  parent.append(wrap);
+  const boardEl = wrap.querySelector('.board');
+  const sqs = [];
+  for (let i = 0; i < 64; i++){ const d = document.createElement('div'); d.className = 'sq'; boardEl.append(d); sqs.push(d); }
+  let flipped = false, lastPly = -1, revealed = false, curOver = false;
+  // guess state
+  let sel = null, guess = null, fbTimer = null;
+  const scored = new Set(); const mine = { correct: 0, total: 0 };
+  const top = { name: wrap.querySelector('.top .name'), clock: wrap.querySelector('.top .clock') };
+  const bot = { name: wrap.querySelector('.bot .name'), clock: wrap.querySelector('.bot .clock') };
+  const movesEl = wrap.querySelector('.moves span'), infoEl = wrap.querySelector('.info');
+  const gstateEl = wrap.querySelector('.gstate');
+  const revealBtn = wrap.querySelector('.reveal');
+  revealBtn.onclick = () => { revealed = true; state.replay?.forceRender(); };
+  wrap.querySelector('.flip').onclick = () => { flipped = !flipped; layoutSquares(); state.replay?.forceRender(); };
+
+  function layoutSquares(){
+    for (let i = 0; i < 64; i++){
+      const r = Math.floor(i/8), c = i%8;
+      const file = flipped ? 7-c : c, rank = flipped ? r : 7-r;
+      const d = sqs[i]; d.dataset.sq = 'abcdefgh'[file] + (rank+1); d.dataset.p = '';
+      d.className = 'sq' + ((file + rank) % 2 === 0 ? ' d' : '');
+    }
+    const w = pname(g.white, g.whiteTitle, g.whiteElo), b = pname(g.black, g.blackTitle, g.blackElo);
+    top.name.innerHTML = flipped ? w : b; bot.name.innerHTML = flipped ? b : w;
+  }
+  layoutSquares();
+
+  function placePieces(fen, pos){
+    const rows = fen.split(' ')[0].split('/'); const map = {};
+    rows.forEach((row, ri) => { let f = 0; for (const ch of row){ if (/\d/.test(ch)) f += +ch; else { map['abcdefgh'[f] + (8-ri)] = ch; f++; } } });
+    const turn = fen.split(' ')[1];
+    for (const d of sqs){
+      const sq = d.dataset.sq, p = map[sq];
+      const isDark = d.classList.contains('d');
+      d.className = 'sq' + (isDark ? ' d' : '') + ((sq === pos.from || sq === pos.to) ? ' hl' : '')
+        + (pos.check && p && p === (turn === 'w' ? 'K' : 'k') ? ' chk' : '');
+      const key = p ? (p === p.toUpperCase() ? 'w' : 'b') + p.toUpperCase() : '';
+      if (d.dataset.p !== key){
+        d.dataset.p = key; d.innerHTML = key ? `<img src="${PIECE_URL(key)}" alt="${key}" draggable="false">` : '';
+      }
+    }
+  }
+
+  /* ----- guess the move ----- */
+  const sqEl = sq => sqs.find(d => d.dataset.sq === sq);
+  const canGuess = () => ctx.guessOn() && !curOver && lastPly >= 0;
+  const sideName = k => g.sideOf(k) === 'w' ? 'White' : 'Black';
+  function paintMarks(){
+    for (const d of sqs) d.classList.remove('sel', 'dot', 'cap', 'gfrom', 'gto');
+    boardEl.classList.toggle('guessable', canGuess());
+    if (canGuess()){
+      if (guess){ sqEl(guess.from)?.classList.add('gfrom'); sqEl(guess.to)?.classList.add('gto'); }
+      if (sel){
+        sqEl(sel)?.classList.add('sel');
+        const ch = new Chess(g.positions[lastPly].fen);
+        for (const m of ch.moves({ square: sel, verbose: true })){
+          const d = sqEl(m.to); d?.classList.add('dot'); if (m.captured) d?.classList.add('cap');
+        }
+      }
+    }
+    const tally = mine.total ? ` · this board <b>${mine.correct}/${mine.total}</b>` : '';
+    if (!ctx.guessOn()) gstateEl.innerHTML = '';
+    else if (curOver) gstateEl.innerHTML = tally ? `Guesses${tally}` : '';
+    else if (guess) gstateEl.innerHTML = `Your guess: <b>${esc(guess.san)}</b>${scored.has(guess.ply) ? ' (not counted – already scored)' : ''}${tally}`;
+    else gstateEl.innerHTML = `Guess ${sideName(lastPly)}'s move${scored.has(lastPly) ? ' (not counted – already scored)' : ''}${tally}`;
+  }
+  boardEl.addEventListener('click', e => {
+    const d = e.target.closest('.sq'); if (!d || !canGuess()) return;
+    const sq = d.dataset.sq;
+    const ch = new Chess(g.positions[lastPly].fen);
+    if (sel){
+      const ms = ch.moves({ square: sel, verbose: true }).filter(m => m.to === sq);
+      if (ms.length){
+        const m = ms.find(x => !x.promotion || x.promotion === 'q');
+        guess = { ply: lastPly, from: m.from, to: m.to, promo: m.promotion || null, san: m.san };
+        sel = null; paintMarks(); return;
+      }
+    }
+    const p = ch.get(sq);
+    if (p && p.color === ch.turn()) sel = sel === sq ? null : sq;
+    else { sel = null; if (guess && (sq === guess.to || sq === guess.from)) guess = null; } // click guess again to cancel
+    paintMarks();
+  });
+  function feedback(ok, text){
+    wrap.querySelector('.toast')?.remove(); clearTimeout(fbTimer);
+    wrap.classList.remove('fb-ok', 'fb-bad'); void wrap.offsetWidth;
+    wrap.classList.add(ok ? 'fb-ok' : 'fb-bad');
+    const t = document.createElement('div'); t.className = 'toast ' + (ok ? 'ok' : 'bad'); t.textContent = text; wrap.append(t);
+    fbTimer = setTimeout(() => { t.remove(); wrap.classList.remove('fb-ok', 'fb-bad'); }, 2400);
+  }
+  function resolveGuess(k){
+    if (!guess) return;
+    if (k > guess.ply){
+      const actual = g.positions[guess.ply + 1];
+      const ok = actual.from === guess.from && actual.to === guess.to && (actual.promotion || null) === (guess.promo || null);
+      const counted = !scored.has(guess.ply);
+      if (counted){ scored.add(guess.ply); mine.total++; if (ok) mine.correct++; ctx.onScore(ok); }
+      const note = counted ? '' : ' (not counted)';
+      feedback(ok, ok ? `✓ Correct! ${actual.san}${note}` : `✗ Played ${actual.san} – you: ${guess.san}${note}`);
+      guess = null;
+    } else if (k < guess.ply) guess = null; // rewound before the guessed move
+  }
+
+  // returns true if game still in progress at t
+  return {
+    resetScore(){ scored.clear(); mine.correct = mine.total = 0; paintMarks(); },
+    update(t, force){
+    let lo = 0, hi = g.moveTimes.length;
+    while (lo < hi){ const m = (lo+hi) >> 1; if (g.moveTimes[m] <= t) lo = m+1; else hi = m; }
+    const k = lo, N = g.plies.length, over = k >= N;
+    if (k !== lastPly || force){
+      if (k !== lastPly){ resolveGuess(k); sel = null; }
+      lastPly = k; curOver = over;
+      placePieces(g.positions[k].fen, g.positions[k]);
+      const from = Math.max(0, k - 12);
+      let txt = '';
+      for (let i = from; i < k; i++){
+        const moveNo = Math.floor((i + (g.startWhite ? 0 : 1)) / 2) + 1;
+        if (g.sideOf(i) === 'w') txt += `${moveNo}. `; else if (i === from) txt += `${moveNo}… `;
+        txt += g.plies[i].san + ' ';
+      }
+      movesEl.textContent = txt.trim() || 'Waiting for the first move…';
+      const showRes = spoilersOn() || revealed;
+      if (over){
+        infoEl.innerHTML = showRes ? `<span class="over">Game over · ${esc(g.result)}</span>` : '<span class="over">Game over</span>';
+        revealBtn.style.display = showRes ? 'none' : '';
+      } else {
+        const moveNo = Math.floor((k + (g.startWhite ? 0 : 1)) / 2) + 1;
+        infoEl.innerHTML = `Board ${esc(g.board)} · move ${moveNo}${g.hasClocks ? '' : ' · <span class="warn">no clocks</span>'}`;
+        revealBtn.style.display = 'none';
+      }
+      paintMarks();
+    }
+    const toMove = over ? null : g.sideOf(k);
+    const lastOf = side => { for (let i = k-1; i >= 0; i--) if (g.sideOf(i) === side) return g.clkAfter[i]; return g.initial; };
+    const cw = lastOf('w'), cb = lastOf('b');
+    const since = t - (k > 0 ? g.moveTimes[k-1] : 0);
+    const val = { w: cw == null ? null : cw - (toMove === 'w' ? since : 0), b: cb == null ? null : cb - (toMove === 'b' ? since : 0) };
+    const setClock = (el, side) => {
+      const v = val[side]; el.textContent = fmtClock(v);
+      el.classList.toggle('run', toMove === side);
+      el.classList.toggle('low', v != null && v < 60);
+    };
+    setClock(flipped ? bot.clock : top.clock, 'b');
+    setClock(flipped ? top.clock : bot.clock, 'w');
+    return !over;
+  }};
+}
+
+showEvents();
+</script>
+</body>
+</html>
